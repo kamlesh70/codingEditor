@@ -21,14 +21,15 @@ const Home = () => {
     navigate(`/editor/${roomId}`, {
       state: {
         userName: userName,
+        id: roomId,
       },
     });
   };
   return (
     <div className="homePageWrapper">
       <div className="formWrapper">
-        <img src="log.png" alt="Code Editor logo" />
-        <h4 className="mainLabel">Past Invitation Room ID</h4>
+        <img src="code-sync.png" alt="Code Editor logo" />
+        <h4 className="mainLabel">Paste Invitation Room ID</h4>
         <div className="inputGroup">
           <input
             type="text"
