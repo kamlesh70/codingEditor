@@ -20,8 +20,8 @@ const Home = () => {
     }
     navigate(`/editor/${roomId}`, {
       state: {
-        userName: userName,
-        id: roomId,
+        userName,
+        roomId,
       },
     });
   };
