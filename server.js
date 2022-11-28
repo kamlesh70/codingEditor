@@ -4,6 +4,7 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 const ACTIONS = require("./src/socketAction");
+const path = require("path");
 
 const io = new Server(server, {
   cors: {
@@ -13,6 +14,8 @@ const io = new Server(server, {
 });
 const cors = require("cors");
 app.use(cors());
+app.use("/static", express.static(path.join(__dirname, "build")));
+app.use(express.static(path.join(__dirname, "build")));
 
 let mapClients = {};
 const getAllClients = (roomId) => {
@@ -27,9 +30,6 @@ const getAllClients = (roomId) => {
 
 io.on("connection", (socket) => {
   console.log("a user connected", socket.id);
-  socket.on("disconnect", () => {
-    console.log("user disconnected");
-  });
   socket.on(ACTIONS.JOIN, ({ userName, roomId }) => {
     socket.join(roomId);
     mapClients[socket.id] = userName;
@@ -43,6 +43,15 @@ io.on("connection", (socket) => {
       });
     });
   });
+
+  socket.on(ACTIONS.CODE_SYNC, ({ roomId, code }) => {
+    socket.in(roomId).emit(ACTIONS.CODE_SYNC, { code });
+  });
+
+  socket.on(ACTIONS.FIRST_CONNECT, ({ code, socket_id }) => {
+    io.to(socket_id).emit(ACTIONS.CODE_SYNC, { code });
+  });
+
   socket.on(ACTIONS.LEAVE, ({ userName, roomId }) => {
     socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
       socket_id: socket.id,
@@ -51,17 +60,21 @@ io.on("connection", (socket) => {
     socket.leave(roomId);
     delete mapClients[socket.id];
   });
-  // socket.on("disconnecting", () => {
-  //   let rooms = [...socket.rooms];
-  //   rooms.forEach((roomId) => {
-  //     socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
-  //       socket_id: socket.id,
-  //       user_name: mapClients[socket.id],
-  //     });
-  //   });
-  //   delete mapClients[socket.id];
-  //   socket.leave();
-  // });
+  socket.on("disconnecting", () => {
+    let rooms = [...socket.rooms];
+    rooms.forEach((roomId) => {
+      socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
+        socket_id: socket.id,
+        user_name: mapClients[socket.id],
+      });
+    });
+    socket.leave();
+    delete mapClients[socket.id];
+  });
+});
+
+app.get("*", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "build", "index.html"));
 });
 
 server.listen(8000, (err) => {

@@ -13,8 +13,13 @@ const EditorPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
-  const [socketId, setSocketId] = useState();
   // return to home page if user name is not provided in
+
+  const codeRef = useRef("");
+
+  const onCodeChange = (code) => {
+    codeRef.current = code;
+  };
 
   useEffect(() => {
     async function init() {
@@ -26,6 +31,16 @@ const EditorPage = () => {
         navigate("/");
       }
       socketRef.current = await initSocket();
+
+      socketRef.current.on("connect_error", (err) => handleErrors(err));
+      socketRef.current.on("connect_failed", (err) => handleErrors(err));
+
+      function handleErrors(e) {
+        console.log("socket error", e);
+        toast.error("Socket connection failed, try again later.");
+        navigate("/");
+      }
+
       socketRef.current.on("connect", () => {
         console.log("connected");
       });
@@ -37,26 +52,32 @@ const EditorPage = () => {
         ACTIONS.JOINED,
         ({ clients, socket_id, user_name }) => {
           setUsers(clients);
-          setSocketId(socket_id);
-          console.log(user_name);
-          if (user_name != location.state.userName) {
+          if (socketRef.current.id != socket_id) {
             toast.success(`${user_name} joined`);
+            socketRef.current.emit(ACTIONS.FIRST_CONNECT, {
+              code: codeRef.current,
+              socket_id,
+            });
           }
         }
       );
       socketRef.current.on(ACTIONS.DISCONNECTED, ({ socket_id, user_name }) => {
-        toast.error(`${user_name} disconnected`);
+        setUsers((prev) => {
+          return prev.filter((user) => user.socket_id !== socket_id);
+        });
+        toast.error(`${user_name} is disconnected`);
       });
       return () => {
         socketRef.current.off("connect");
+        socketRef.current.off(ACTIONS.JOINED);
+        socketRef.current.off(ACTIONS.DISCONNECTED);
         socketRef.current.off("disconnect");
       };
     }
     if (ran.current) {
-      init();
       ran.current = false;
+      init();
     }
-    console.log("running  -----------------------------");
   }, []); // providing empty array in second argument is very important otherwise useEffect will run for every render.
 
   console.log(users);
@@ -68,13 +89,13 @@ const EditorPage = () => {
       roomId: location.state.roomId,
     });
     socketRef.current.disconnect();
-    navigate("/");
     setUsers([]);
+    navigate("/");
   };
   const onCopy = async (e) => {
     e.preventDefault();
     try {
-      await navigator.clipboard.writeText(location.state.id);
+      await navigator.clipboard.writeText(location.state.roomId);
       toast.success("Copied!");
     } catch (err) {
       toast.error("Failed to copy!");
@@ -100,7 +121,11 @@ const EditorPage = () => {
         </div>
       </div>
       <div className="editorWrap">
-        <Editor />
+        <Editor
+          socketRef={socketRef}
+          roomId={location.state.roomId}
+          codeChange={onCodeChange}
+        />
       </div>
     </div>
   );
