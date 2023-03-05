@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
 
 export const initSocket = async () => {
-  console.log("this is called");
+  console.log("this is called initSocket");
   const options = {
     "force new connection": true,
     reconnectionAttempts: "Infinity",
